@@ -112,6 +112,7 @@ def plot_shap_3d(shap_values: shap.Explanation,
         shap_feature (str, optional): Z軸にする特徴量名（指定なしの場合は平均SHAP値）
         class_index (int, optional): 多クラス分類時の対象クラスindex
     """
+    print("📊 plot_shap_3d() 実行中...")  # ←この行を追加
     try:
         if shap_feature:
             shap_z = shap_values[:, :, class_index].values[:, X_sample.columns.get_loc(shap_feature)]
