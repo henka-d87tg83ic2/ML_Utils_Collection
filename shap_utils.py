@@ -94,31 +94,22 @@ def plot_shap_waterfall(shap_values: shap.Explanation, row_index: int = 0) -> No
 # SHAP 3D可視化関数
 # ================================================
 
-def plot_shap_3d(shap_values: shap.Explanation,
-                 X_sample: pd.DataFrame,
-                 feature_x: str,
-                 feature_y: str,
-                 shap_feature: Optional[str] = None,
-                 class_index: int = 0
-                 ) -> None:
-    """
-    特徴量2軸 × SHAP値 を3Dプロットする関数（plotly）
-
-    Args:
-        shap_values (shap.Explanation): 計算済みのSHAP値
-        X_sample (pd.DataFrame): 入力特徴量データ
-        feature_x (str): X軸にする特徴量名
-        feature_y (str): Y軸にする特徴量名
-        shap_feature (str, optional): Z軸にする特徴量名（指定なしの場合は平均SHAP値）
-        class_index (int, optional): 多クラス分類時の対象クラスindex
-    """
-    print("📊 plot_shap_3d() 実行中...")  # ←この行を追加
+def plot_shap_3d(shap_values, X_sample, feature_x, feature_y, shap_feature=None, class_index=0):
+    print("📊 plot_shap_3d() 実行中...")
     try:
         if shap_feature:
-            shap_z = shap_values[:, :, class_index].values[:, X_sample.columns.get_loc(shap_feature)]
+            # 単クラス分類 → class_index使わずそのまま取り出す
+            if len(shap_values.shape) == 2:
+                shap_z = shap_values.values[:, X_sample.columns.get_loc(shap_feature)]
+            else:
+                shap_z = shap_values[:, :, class_index].values[:, X_sample.columns.get_loc(shap_feature)]
             title_z = shap_feature
         else:
-            shap_z = shap_values[:, :, class_index].values.mean(axis=1)
+            # 平均SHAP値の計算（単クラスか多クラスか判定）
+            if len(shap_values.shape) == 2:
+                shap_z = shap_values.values.mean(axis=1)
+            else:
+                shap_z = shap_values[:, :, class_index].values.mean(axis=1)
             title_z = "SHAP mean"
 
         df_plot = pd.DataFrame({
@@ -137,6 +128,7 @@ def plot_shap_3d(shap_values: shap.Explanation,
 
     except Exception as e:
         logger.error(f"❌ 3D SHAPプロットエラー: {e}")
+
 
 # ================================================
 # SHAP値保存・読み込み関数
