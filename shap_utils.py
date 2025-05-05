@@ -58,17 +58,10 @@ def compute_shap_values(model: Any, X_sample: pd.DataFrame) -> shap.Explanation:
         return None
 
 # ================================================
-# SHAP可視化関数（Summary／Waterfall／Interaction Heatmap）
+# SHAP可視化関数（Summary／Waterfall／Interaction Heatmap／Decision Boundary）
 # ================================================
 
 def plot_shap_summary(shap_values: shap.Explanation, features: pd.DataFrame) -> None:
-    """
-    SHAP Summary Plotを描画する関数
-
-    Args:
-        shap_values (shap.Explanation): 計算済みのSHAP値
-        features (pd.DataFrame): 入力特徴量データ
-    """
     try:
         logger.info("📈 SHAP Summary Plotを描画中...")
         shap.summary_plot(shap_values.values, features)
@@ -78,13 +71,6 @@ def plot_shap_summary(shap_values: shap.Explanation, features: pd.DataFrame) -> 
 
 
 def plot_shap_waterfall(shap_values: shap.Explanation, row_index: int = 0) -> None:
-    """
-    指定サンプルのSHAP Waterfall Plotを描画する関数
-
-    Args:
-        shap_values (shap.Explanation): 計算済みのSHAP値
-        row_index (int, optional): プロットするサンプルのインデックス（デフォルト0）
-    """
     try:
         logger.info(f"📈 SHAP Waterfall Plotを描画中（サンプル index={row_index}）...")
         shap.plots.waterfall(shap_values[row_index])
@@ -102,18 +88,6 @@ def plot_shap_interaction_heatmap_nodiag(
     vmin: float = None,
     vmax: float = None
 ) -> None:
-    """
-    SHAP Interaction Heatmap（対角成分除外版）を描画する関数
-
-    Args:
-        interaction_matrix (np.ndarray): SHAPの相互作用行列（2次元）
-        feature_names (list[str]): 特徴量名のリスト
-        title (str): ヒートマップのタイトル
-        figsize (tuple): 図のサイズ（デフォルト: (12, 10)）
-        center (float): カラーマップの中心値（デフォルト: 0）
-        vmin (float): 最小値（デフォルト: 自動）
-        vmax (float): 最大値（デフォルト: 自動）
-    """
     try:
         logger.info("📊 SHAP Interaction Heatmap（対角除外）を描画中...")
 
@@ -121,11 +95,9 @@ def plot_shap_interaction_heatmap_nodiag(
         import matplotlib.pyplot as plt
         import seaborn as sns
 
-        # 対角成分をゼロに設定（値に影響しないが、視覚的に強調を避ける）
         matrix_nodiag = interaction_matrix.copy()
         np.fill_diagonal(matrix_nodiag, 0)
 
-        # 描画
         plt.figure(figsize=figsize)
         sns.heatmap(
             matrix_nodiag,
@@ -148,6 +120,70 @@ def plot_shap_interaction_heatmap_nodiag(
         logger.info("✅ 対角除外ヒートマップ描画完了")
     except Exception as e:
         logger.error(f"❌ 対角除外ヒートマップ描画エラー: {e}")
+
+
+def plot_shap_decision_boundary(
+    model,
+    explainer,
+    X_scaled,
+    shap_values,
+    feature_x,
+    feature_y,
+    class_index=1,
+    cmap_boundary="RdBu",
+    cmap_shap="viridis",
+    figsize=(10, 8),
+    grid_resolution=100,
+    title=None
+) -> None:
+    """
+    指定した2特徴の空間上で決定境界とSHAP値を重ねて可視化する関数
+    """
+    try:
+        logger.info(f"📈 SHAP + 決定境界を可視化中: {feature_x} × {feature_y}")
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        import pandas as pd
+
+        fx_idx = X_scaled.columns.get_loc(feature_y)
+        x_vals = np.linspace(X_scaled[feature_x].min(), X_scaled[feature_x].max(), grid_resolution)
+        y_vals = np.linspace(X_scaled[feature_y].min(), X_scaled[feature_y].max(), grid_resolution)
+        xx, yy = np.meshgrid(x_vals, y_vals)
+        grid = pd.DataFrame(np.c_[xx.ravel(), yy.ravel()], columns=[feature_x, feature_y])
+
+        X_mean = X_scaled.mean()
+        for col in X_scaled.columns:
+            if col not in [feature_x, feature_y]:
+                grid[col] = X_mean[col]
+        grid = grid[X_scaled.columns]  # 列順を一致させる
+
+        Z = model.predict_proba(grid)[:, class_index].reshape(xx.shape)
+
+        shap_val = shap_values.values[:, fx_idx, class_index]
+        df_plot = pd.DataFrame({
+            feature_x: X_scaled[feature_x],
+            feature_y: X_scaled[feature_y],
+            "SHAP": shap_val
+        })
+
+        plt.figure(figsize=figsize)
+        plt.contourf(xx, yy, Z, levels=20, cmap=cmap_boundary, alpha=0.6)
+        sc = plt.scatter(df_plot[feature_x], df_plot[feature_y], c=df_plot["SHAP"], cmap=cmap_shap, edgecolor="k")
+        plt.colorbar(sc, label="SHAP value")
+        plt.xlabel(feature_x)
+        plt.ylabel(feature_y)
+        if title:
+            plt.title(title)
+        else:
+            plt.title(f"SHAP + 決定境界: {feature_x} × {feature_y}")
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
+
+        logger.info("✅ SHAP + 決定境界の重ね描画完了")
+    except Exception as e:
+        logger.error(f"❌ 決定境界可視化エラー: {e}")
 
 # ================================================
 # SHAP 3D可視化関数（拡張版）
