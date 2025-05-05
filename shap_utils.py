@@ -91,10 +91,11 @@ def plot_shap_waterfall(shap_values: shap.Explanation, row_index: int = 0) -> No
         logger.error(f"❌ Waterfall Plot描画エラー: {e}")
 
 # ================================================
-# SHAP 3D可視化関数
+# SHAP 3D可視化関数（拡張版）
 # ================================================
-
-def plot_shap_3d(shap_values, X_sample, feature_x, feature_y, shap_feature=None, class_index=1):
+def plot_shap_3d(shap_values, X_sample, feature_x, feature_y,
+                 shap_feature=None, class_index=1,
+                 width=1200, height=900, renderer="colab"):
     print("📊 plot_shap_3d() 実行中...")
     try:
         import pandas as pd
@@ -102,17 +103,14 @@ def plot_shap_3d(shap_values, X_sample, feature_x, feature_y, shap_feature=None,
         import shap
         import numpy as np
 
-        # Explanation型の場合は .values を抽出
         if isinstance(shap_values, shap.Explanation):
             values = shap_values.values
         else:
             values = shap_values
 
-        # 3次元SHAP値（多クラス） → 指定クラスだけ抽出
         if values.ndim == 3:
             values = values[:, :, class_index]
 
-        # shap_feature が指定されていれば、その特徴に限定
         if shap_feature:
             if shap_feature not in X_sample.columns:
                 raise ValueError(f"指定された特徴名 '{shap_feature}' は X_sample に存在しません。")
@@ -134,10 +132,13 @@ def plot_shap_3d(shap_values, X_sample, feature_x, feature_y, shap_feature=None,
             color="SHAP", opacity=0.7,
             title=f"3D SHAP Plot: {feature_x} × {feature_y} × {title_z}"
         )
-        fig.show(renderer="colab")
+
+        fig.update_layout(width=width, height=height)
+        fig.show(renderer=renderer)
 
     except Exception as e:
         print(f"❌ 3D SHAPプロットエラー: {e}")
+
 
 
 
@@ -180,3 +181,61 @@ def load_shap_values(path: str) -> Optional[shap.Explanation]:
     except Exception as e:
         logger.error(f"❌ SHAP読込エラー: {e}")
         return None
+
+# ================================================
+# SHAP Interaction Heatmap（明るさ＝強さ）
+# ================================================
+def plot_interaction_heatmap(
+    interaction_matrix, feature_names, title="SHAP Interaction Heatmap",
+    cmap="OrRd", figsize=(12, 10), linewidths=0.5, annot=False
+):
+    """
+    SHAP相互作用行列のヒートマップを可視化する関数。
+
+    Parameters:
+    ----------
+    interaction_matrix : np.ndarray
+        2次元の SHAP interaction 値の行列（平均絶対値を取ったものを想定）
+
+    feature_names : list or pd.Index
+        行列の各軸に対応する特徴名
+
+    title : str
+        プロットのタイトル
+
+    cmap : str
+        色マップ（デフォルト: "OrRd"）
+
+    figsize : tuple
+        表示サイズ（横, 縦）
+
+    linewidths : float
+        セル境界の線の太さ
+
+    annot : bool
+        各セルに数値を表示するか（True推奨は小規模行列時のみ）
+    """
+    print("📊 plot_interaction_heatmap() 実行中...")
+    try:
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+
+        plt.figure(figsize=figsize)
+        sns.heatmap(
+            interaction_matrix,
+            xticklabels=feature_names,
+            yticklabels=feature_names,
+            cmap=cmap,
+            center=0,
+            linewidths=linewidths,
+            annot=annot
+        )
+        plt.title(f"{title}（明るさ＝強さ）", fontsize=14)
+        plt.xticks(rotation=90)
+        plt.yticks(rotation=0)
+        plt.tight_layout()
+        plt.show()
+
+    except Exception as e:
+        print(f"❌ ヒートマップ描画エラー: {e}")
+
