@@ -58,7 +58,7 @@ def compute_shap_values(model: Any, X_sample: pd.DataFrame) -> shap.Explanation:
         return None
 
 # ================================================
-# SHAP可視化関数（Summary／Waterfall）
+# SHAP可視化関数（Summary／Waterfall／Interaction Heatmap）
 # ================================================
 
 def plot_shap_summary(shap_values: shap.Explanation, features: pd.DataFrame) -> None:
@@ -92,14 +92,27 @@ def plot_shap_waterfall(shap_values: shap.Explanation, row_index: int = 0) -> No
     except Exception as e:
         logger.error(f"❌ Waterfall Plot描画エラー: {e}")
 
-def plot_shap_interaction_heatmap_nodiag(interaction_matrix: np.ndarray, feature_names: list[str], title: str = "") -> None:
+
+def plot_shap_interaction_heatmap_nodiag(
+    interaction_matrix: np.ndarray,
+    feature_names: list[str],
+    title: str = "SHAP Interaction Heatmap (No Diagonal)",
+    figsize: tuple = (12, 10),
+    center: float = 0.0,
+    vmin: float = None,
+    vmax: float = None
+) -> None:
     """
     SHAP Interaction Heatmap（対角成分除外版）を描画する関数
 
     Args:
         interaction_matrix (np.ndarray): SHAPの相互作用行列（2次元）
         feature_names (list[str]): 特徴量名のリスト
-        title (str): ヒートマップのタイトル（任意）
+        title (str): ヒートマップのタイトル
+        figsize (tuple): 図のサイズ（デフォルト: (12, 10)）
+        center (float): カラーマップの中心値（デフォルト: 0）
+        vmin (float): 最小値（デフォルト: 自動）
+        vmax (float): 最大値（デフォルト: 自動）
     """
     try:
         logger.info("📊 SHAP Interaction Heatmap（対角除外）を描画中...")
@@ -108,18 +121,24 @@ def plot_shap_interaction_heatmap_nodiag(interaction_matrix: np.ndarray, feature
         import matplotlib.pyplot as plt
         import seaborn as sns
 
-        # 対角成分をゼロに設定
+        # 対角成分をゼロに設定（値に影響しないが、視覚的に強調を避ける）
         matrix_nodiag = interaction_matrix.copy()
         np.fill_diagonal(matrix_nodiag, 0)
 
         # 描画
-        plt.figure(figsize=(15, 13))
-        sns.heatmap(matrix_nodiag,
-                    xticklabels=feature_names,
-                    yticklabels=feature_names,
-                    cmap="Reds", square=True,
-                    linewidths=0.5,
-                    cbar_kws={"label": "Mean SHAP Interaction"})
+        plt.figure(figsize=figsize)
+        sns.heatmap(
+            matrix_nodiag,
+            xticklabels=feature_names,
+            yticklabels=feature_names,
+            cmap="Reds",
+            center=center,
+            vmin=vmin,
+            vmax=vmax,
+            square=True,
+            linewidths=0.5,
+            cbar_kws={"label": "Mean SHAP Interaction"}
+        )
         plt.title(title, fontsize=16)
         plt.xticks(rotation=90)
         plt.yticks(rotation=0)
@@ -129,7 +148,6 @@ def plot_shap_interaction_heatmap_nodiag(interaction_matrix: np.ndarray, feature
         logger.info("✅ 対角除外ヒートマップ描画完了")
     except Exception as e:
         logger.error(f"❌ 対角除外ヒートマップ描画エラー: {e}")
-
 
 # ================================================
 # SHAP 3D可視化関数（拡張版）
