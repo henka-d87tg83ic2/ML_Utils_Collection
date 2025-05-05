@@ -185,6 +185,59 @@ def plot_shap_decision_boundary(
     except Exception as e:
         logger.error(f"❌ 決定境界可視化エラー: {e}")
 
+def plot_shap_meshgrid(
+    shap_values: shap.Explanation,
+    X_scaled: pd.DataFrame,
+    feature_x: str,
+    feature_y: str,
+    class_index: int = 1,
+    resolution: int = 100,
+    cmap: str = "coolwarm",
+    figsize: tuple = (10, 8),
+    title: str = None
+) -> None:
+    """
+    SHAP値の2軸メッシュ構造を等高線で可視化する関数
+    """
+    try:
+        import numpy as np
+        import matplotlib.pyplot as plt
+
+        # 対象インデックス
+        fx_idx = X_scaled.columns.get_loc(feature_x)
+        fy_idx = X_scaled.columns.get_loc(feature_y)
+
+        # データ取得
+        x = X_scaled[feature_x].values
+        y = X_scaled[feature_y].values
+        z = shap_values.values[:, fy_idx, class_index]  # Y軸に対応するSHAP値
+
+        # メッシュグリッド作成
+        xi = np.linspace(x.min(), x.max(), resolution)
+        yi = np.linspace(y.min(), y.max(), resolution)
+        xi, yi = np.meshgrid(xi, yi)
+
+        # グリッド補間
+        from scipy.interpolate import griddata
+        zi = griddata((x, y), z, (xi, yi), method='cubic')
+
+        # 描画
+        plt.figure(figsize=figsize)
+        contour = plt.contourf(xi, yi, zi, levels=20, cmap=cmap, alpha=0.8)
+        sc = plt.scatter(x, y, c=z, cmap=cmap, edgecolor='k', s=40)
+        plt.colorbar(contour, label='SHAP value')
+        plt.xlabel(feature_x)
+        plt.ylabel(feature_y)
+        plt.title(title or f"SHAP 2Dメッシュ: {feature_x} × {feature_y}")
+        plt.grid(True)
+        plt.tight_layout()
+        plt.show()
+
+        logger.info("✅ SHAP メッシュプロット描画完了")
+    except Exception as e:
+        logger.error(f"❌ SHAPメッシュ描画エラー: {e}")
+
+
 # ================================================
 # SHAP 3D可視化関数（拡張版）
 # ================================================
