@@ -20,6 +20,8 @@ import plotly.express as px
 import os
 import logging
 from typing import Any, Optional, Union
+import numpy as np
+
 
 # ログ設定
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
