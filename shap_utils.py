@@ -57,8 +57,15 @@ def compute_shap_values(model: Any, X_sample: pd.DataFrame) -> shap.Explanation:
         logger.error(f"❌ SHAP値計算エラー: {e}")
         return None
 
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import shap
+from sklearn.inspection import PartialDependenceDisplay
+from scipy.interpolate import griddata
+
 # ================================================
-# SHAP可視化関数（Summary／Waterfall／Interaction Heatmap／Decision Boundary）
+# SHAP可視化関数（Summary／Waterfall／Heatmap／Decision Boundary／PDP／ICE）
 # ================================================
 
 def plot_shap_summary(shap_values: shap.Explanation, features: pd.DataFrame) -> None:
@@ -90,14 +97,9 @@ def plot_shap_interaction_heatmap_nodiag(
 ) -> None:
     try:
         logger.info("📊 SHAP Interaction Heatmap（対角除外）を描画中...")
-
-        import numpy as np
-        import matplotlib.pyplot as plt
         import seaborn as sns
-
         matrix_nodiag = interaction_matrix.copy()
         np.fill_diagonal(matrix_nodiag, 0)
-
         plt.figure(figsize=figsize)
         sns.heatmap(
             matrix_nodiag,
@@ -116,127 +118,100 @@ def plot_shap_interaction_heatmap_nodiag(
         plt.yticks(rotation=0)
         plt.tight_layout()
         plt.show()
-
         logger.info("✅ 対角除外ヒートマップ描画完了")
     except Exception as e:
         logger.error(f"❌ 対角除外ヒートマップ描画エラー: {e}")
 
 
-def plot_shap_decision_boundary(
-    model,
-    explainer,
-    X_scaled,
-    shap_values,
-    feature_x,
-    feature_y,
-    class_index=1,
-    cmap_boundary="RdBu",
-    cmap_shap="viridis",
-    figsize=(10, 8),
-    grid_resolution=100,
-    title=None
-) -> None:
-    """
-    指定した2特徴の空間上で決定境界とSHAP値を重ねて可視化する関数
-    """
+def plot_shap_decision_boundary(model, explainer, X_scaled, shap_values, feature_x, feature_y,
+                                class_index=1, cmap_boundary="RdBu", cmap_shap="viridis",
+                                figsize=(10, 8), grid_resolution=100, title=None):
     try:
         logger.info(f"📈 SHAP + 決定境界を可視化中: {feature_x} × {feature_y}")
-
-        import numpy as np
-        import matplotlib.pyplot as plt
-        import pandas as pd
-
         fx_idx = X_scaled.columns.get_loc(feature_y)
         x_vals = np.linspace(X_scaled[feature_x].min(), X_scaled[feature_x].max(), grid_resolution)
         y_vals = np.linspace(X_scaled[feature_y].min(), X_scaled[feature_y].max(), grid_resolution)
         xx, yy = np.meshgrid(x_vals, y_vals)
         grid = pd.DataFrame(np.c_[xx.ravel(), yy.ravel()], columns=[feature_x, feature_y])
-
-        X_mean = X_scaled.mean()
         for col in X_scaled.columns:
             if col not in [feature_x, feature_y]:
-                grid[col] = X_mean[col]
-        grid = grid[X_scaled.columns]  # 列順を一致させる
-
+                grid[col] = X_scaled[col].mean()
+        grid = grid[X_scaled.columns]
         Z = model.predict_proba(grid)[:, class_index].reshape(xx.shape)
-
         shap_val = shap_values.values[:, fx_idx, class_index]
-        df_plot = pd.DataFrame({
-            feature_x: X_scaled[feature_x],
-            feature_y: X_scaled[feature_y],
-            "SHAP": shap_val
-        })
-
+        df_plot = pd.DataFrame({feature_x: X_scaled[feature_x], feature_y: X_scaled[feature_y], "SHAP": shap_val})
         plt.figure(figsize=figsize)
         plt.contourf(xx, yy, Z, levels=20, cmap=cmap_boundary, alpha=0.6)
         sc = plt.scatter(df_plot[feature_x], df_plot[feature_y], c=df_plot["SHAP"], cmap=cmap_shap, edgecolor="k")
         plt.colorbar(sc, label="SHAP value")
         plt.xlabel(feature_x)
         plt.ylabel(feature_y)
-        if title:
-            plt.title(title)
-        else:
-            plt.title(f"SHAP + 決定境界: {feature_x} × {feature_y}")
+        plt.title(title or f"SHAP + Decision Boundary: {feature_x} × {feature_y}")
         plt.grid(True)
         plt.tight_layout()
         plt.show()
-
         logger.info("✅ SHAP + 決定境界の重ね描画完了")
     except Exception as e:
         logger.error(f"❌ 決定境界可視化エラー: {e}")
 
-def plot_shap_meshgrid(
-    shap_values: shap.Explanation,
-    X_scaled: pd.DataFrame,
-    feature_x: str,
-    feature_y: str,
-    class_index: int = 1,
-    resolution: int = 100,
-    cmap: str = "coolwarm",
-    figsize: tuple = (10, 8),
-    title: str = None
-) -> None:
-    """
-    SHAP値の2軸メッシュ構造を等高線で可視化する関数
-    """
+
+def plot_shap_meshgrid(shap_values, X_scaled, feature_x, feature_y, class_index=1,
+                       resolution=100, cmap="coolwarm", figsize=(10, 8), title=None):
     try:
-        import numpy as np
-        import matplotlib.pyplot as plt
-
-        # 対象インデックス
-        fx_idx = X_scaled.columns.get_loc(feature_x)
-        fy_idx = X_scaled.columns.get_loc(feature_y)
-
-        # データ取得
+        fx_idx = X_scaled.columns.get_loc(feature_y)
         x = X_scaled[feature_x].values
         y = X_scaled[feature_y].values
-        z = shap_values.values[:, fy_idx, class_index]  # Y軸に対応するSHAP値
-
-        # メッシュグリッド作成
+        z = shap_values.values[:, fx_idx, class_index]
         xi = np.linspace(x.min(), x.max(), resolution)
         yi = np.linspace(y.min(), y.max(), resolution)
         xi, yi = np.meshgrid(xi, yi)
-
-        # グリッド補間
-        from scipy.interpolate import griddata
         zi = griddata((x, y), z, (xi, yi), method='cubic')
-
-        # 描画
         plt.figure(figsize=figsize)
         contour = plt.contourf(xi, yi, zi, levels=20, cmap=cmap, alpha=0.8)
         sc = plt.scatter(x, y, c=z, cmap=cmap, edgecolor='k', s=40)
         plt.colorbar(contour, label='SHAP value')
         plt.xlabel(feature_x)
         plt.ylabel(feature_y)
-        plt.title(title or f"SHAP 2Dメッシュ: {feature_x} × {feature_y}")
+        plt.title(title or f"SHAP 2D Mesh: {feature_x} × {feature_y}")
         plt.grid(True)
         plt.tight_layout()
         plt.show()
-
         logger.info("✅ SHAP メッシュプロット描画完了")
     except Exception as e:
         logger.error(f"❌ SHAPメッシュ描画エラー: {e}")
 
+
+def plot_pdp_1d(model, X_scaled, feature_name, class_index=1):
+    try:
+        disp = PartialDependenceDisplay.from_estimator(
+            model, X_scaled, features=[feature_name], kind="average",
+            grid_resolution=50, feature_names=X_scaled.columns, target=class_index
+        )
+        disp.figure_.set_size_inches(8, 6)
+    except Exception as e:
+        print(f"[Error] plot_pdp_1d: {e}")
+
+
+def plot_pdp_ice(model, X_scaled, feature_name, class_index=1):
+    try:
+        disp = PartialDependenceDisplay.from_estimator(
+            model, X_scaled, features=[feature_name], kind="both",
+            grid_resolution=50, feature_names=X_scaled.columns, target=class_index
+        )
+        disp.figure_.set_size_inches(8, 6)
+    except Exception as e:
+        print(f"[Error] plot_pdp_ice: {e}")
+
+
+def plot_pdp_2d(model, X_scaled, feature_pair, class_index=1):
+    try:
+        disp = PartialDependenceDisplay.from_estimator(
+            model, X_scaled, features=[feature_pair], kind="average",
+            grid_resolution=50, feature_names=X_scaled.columns, target=class_index
+        )
+        disp.figure_.set_size_inches(8, 6)
+    except Exception as e:
+        print(f"[Error] plot_pdp_2d: {e}")
 
 # ================================================
 # SHAP 3D可視化関数（拡張版）
