@@ -90,6 +90,45 @@ def plot_shap_waterfall(shap_values: shap.Explanation, row_index: int = 0) -> No
     except Exception as e:
         logger.error(f"❌ Waterfall Plot描画エラー: {e}")
 
+def plot_shap_interaction_heatmap_nodiag(interaction_matrix: np.ndarray, feature_names: list[str], title: str = "") -> None:
+    """
+    SHAP Interaction Heatmap（対角成分除外版）を描画する関数
+
+    Args:
+        interaction_matrix (np.ndarray): SHAPの相互作用行列（2次元）
+        feature_names (list[str]): 特徴量名のリスト
+        title (str): ヒートマップのタイトル（任意）
+    """
+    try:
+        logger.info("📊 SHAP Interaction Heatmap（対角除外）を描画中...")
+
+        import numpy as np
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+
+        # 対角成分をゼロに設定
+        matrix_nodiag = interaction_matrix.copy()
+        np.fill_diagonal(matrix_nodiag, 0)
+
+        # 描画
+        plt.figure(figsize=(15, 13))
+        sns.heatmap(matrix_nodiag,
+                    xticklabels=feature_names,
+                    yticklabels=feature_names,
+                    cmap="Reds", square=True,
+                    linewidths=0.5,
+                    cbar_kws={"label": "Mean SHAP Interaction"})
+        plt.title(title, fontsize=16)
+        plt.xticks(rotation=90)
+        plt.yticks(rotation=0)
+        plt.tight_layout()
+        plt.show()
+
+        logger.info("✅ 対角除外ヒートマップ描画完了")
+    except Exception as e:
+        logger.error(f"❌ 対角除外ヒートマップ描画エラー: {e}")
+
+
 # ================================================
 # SHAP 3D可視化関数（拡張版）
 # ================================================
