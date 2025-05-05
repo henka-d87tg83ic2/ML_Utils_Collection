@@ -133,7 +133,38 @@ def plot_shap_3d(shap_values, X_sample, feature_x, feature_y,
             title=f"3D SHAP Plot: {feature_x} × {feature_y} × {title_z}"
         )
 
-        fig.update_layout(width=width, height=height)
+        fig.update_layout(
+    width=width,
+    height=height,
+    paper_bgcolor="rgba(0,0,0,0)",  # 外枠：透明
+    scene=dict(
+        xaxis=dict(
+            title=feature_x,
+            showbackground=True,
+            backgroundcolor="burlywood",
+            gridcolor="white",
+            title_font=dict(size=22),
+            tickfont=dict(size=18)
+        ),
+        yaxis=dict(
+            title=feature_y,
+            showbackground=True,
+            backgroundcolor="burlywood",
+            gridcolor="white",
+            title_font=dict(size=22),
+            tickfont=dict(size=18)
+        ),
+        zaxis=dict(
+            title="SHAP Value",
+            showbackground=True,
+            backgroundcolor="burlywood",
+            gridcolor="white",
+            title_font=dict(size=22),
+            tickfont=dict(size=18)
+        )
+    )
+)
+
         fig.show(renderer=renderer)
 
     except Exception as e:
